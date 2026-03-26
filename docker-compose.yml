@@ -1,0 +1,15 @@
+services:
+  currency-api:
+    build: .
+    container_name: currency-api
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    env_file:
+      - .env
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:${PORT}/info"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
