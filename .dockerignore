@@ -1,0 +1,10 @@
+.git
+.gitignore
+Dockerfile
+docker-compose.yml
+docker-compose.hardened.yml
+.env
+.env.*
+*.md
+*.json
+.gitlab-ci.yml
