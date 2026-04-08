@@ -1,9 +1,68 @@
-include:
-  - project: education/devops/automation/ci
-    ref: master
-    file: ci.yml
+stages:
+  - lint
+  - test
+  - build
+  - deploy
+
 variables:
+  CONTAINER_NAME: currency-app
+  IMAGE_TAG: $CI_REGISTRY/$CI_REGISTRY_USER/$CONTAINER_NAME:$CI_COMMIT_SHORT_SHA
   PORT: 8000
   VERSION: 0.1.0
   SERVICE: currency
   AUTHOR: a.pochebut
+
+.deps:
+  before_script:
+    - go mod download
+  cache:
+    paths:
+      - .cache/go-build
+      - go/pkg/mod
+    key:
+      files_commits:
+        - go.sum
+
+lint:golangci:
+  stage: lint
+  image:
+    name: golangci/golangci-lint:v2.11.3
+    entrypoint: [""]
+  script:
+    - golangci-lint run ./...
+
+test:unit:
+  stage: test
+  image: golang:1.25-alpine
+  extends: .deps
+  script:
+    - go test -v -cover ./...
+
+.docker:
+  image: docker:24
+  services:
+    - docker:24-dind
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
+
+build:docker:
+  stage: build
+  extends: .docker
+  script:
+    - docker build -t $IMAGE_TAG .
+    - docker push $IMAGE_TAG
+
+deploy:
+  stage: deploy
+  extends: .docker
+  tags:
+    - prod
+  script:
+    - docker pull $IMAGE_TAG
+    - docker stop $CONTAINER_NAME || true
+    - docker rm $CONTAINER_NAME || true
+    - docker run -d --name $CONTAINER_NAME --restart unless-stopped -p $PORT:$PORT $IMAGE_TAG
+    - docker ps | grep $CONTAINER_NAME
+  only:
+    - master
+  when: manual
