@@ -16,7 +16,9 @@ type Config struct {
 }
 
 func Load() Config {
-	godotenv.Load()
+	if err := godotenv.Load(); err != nil {
+		log.Println(".env file not found")
+	}
 
 	port := getEnv("PORT", "8000")
 	if !regexp.MustCompile(`^\d+$`).MatchString(port) {

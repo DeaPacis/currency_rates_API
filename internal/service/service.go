@@ -23,7 +23,11 @@ func GetCurrencyRates(date string) (map[string]float64, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Println("error closing response body:", err)
+		}
+	}()
 
 	return parseCurrencyXML(resp)
 }
