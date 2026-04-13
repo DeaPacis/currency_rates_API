@@ -52,6 +52,6 @@ smoke-test:
       for i in $(seq 1 30); do
         curl -f http://localhost:$APP_PORT/info && break || sleep 2;
       done
-    - curl -f -LI http://localhost:$APP_PORT/info
+    - curl -f -L http://localhost:$APP_PORT/info
   tags:
     - $[[ inputs.environment ]]
