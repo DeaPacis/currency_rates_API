@@ -45,13 +45,13 @@ run:
 
 smoke-test:
   stage: smoke
-  image: alpine/curl:latest
+  image: alpine/curl:8.14.1
   script:
     - |
       echo "Waiting for container to be ready..."
       for i in $(seq 1 30); do
         curl -f http://localhost:$APP_PORT/info && break || sleep 2;
       done
-    - curl -f -L http://localhost:$APP_PORT/info
+    - curl -f -L http://localhost:$APP_PORT/info || exit 1
   tags:
     - $[[ inputs.environment ]]
