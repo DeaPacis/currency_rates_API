@@ -26,12 +26,10 @@ variables:
   CONTAINER_NAME: "$[[ inputs.container-name ]]-$[[ inputs.environment ]]"
 
 stages:
-  - run
-  - smoke
+  - deploy
 
-run:
-  stage: run
-  resource_group: deploy-group-$[[ inputs.environment ]]
+deploy:
+  stage: deploy
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
     - docker pull $IMAGE_TAG
@@ -41,15 +39,6 @@ run:
       docker rm $CONTAINER_NAME || true
       docker run -d --name $CONTAINER_NAME --restart unless-stopped -p $APP_PORT:$APP_PORT $IMAGE_TAG
     - docker ps | grep $CONTAINER_NAME
-  tags:
-    - $[[ inputs.environment ]]
-
-smoke-test:
-  stage: smoke
-  resource_group: deploy-group-$[[ inputs.environment ]]
-  needs: ["run"]
-  image: alpine/curl:8.14.1
-  script:
     - |
       echo "Waiting for container to be ready..."
       for i in $(seq 1 30); do
