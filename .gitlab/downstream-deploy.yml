@@ -31,6 +31,7 @@ stages:
 
 run:
   stage: run
+  resource_group: deploy-group-$[[ inputs.environment ]]
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
     - docker pull $IMAGE_TAG
@@ -45,6 +46,8 @@ run:
 
 smoke-test:
   stage: smoke
+  resource_group: deploy-group-$[[ inputs.environment ]]
+  needs: ["run"]
   image: alpine/curl:8.14.1
   script:
     - |
