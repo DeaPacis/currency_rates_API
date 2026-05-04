@@ -2,15 +2,21 @@ stages:
   - lint
   - test
   - build
+  - sca
+  - push
   - deploy
 
 variables:
   CONTAINER_NAME: currency-app
-  IMAGE_TAG: $CI_REGISTRY/$CI_REGISTRY_USER/$CONTAINER_NAME:$CI_COMMIT_SHORT_SHA
-  PORT: 8000
+  IMAGE_NAME: $CI_REGISTRY/$CI_REGISTRY_USER/$CONTAINER_NAME
+  IMAGE_TARBALL: $CONTAINER_NAME-$CI_COMMIT_SHORT_SHA.tar
+  PORT: "8000"
   VERSION: 0.1.0
   SERVICE: currency
   AUTHOR: a.pochebut
+
+include:
+  - local: '.gitlab/docker-template.yml'
 
 .deps:
   before_script:
@@ -23,13 +29,39 @@ variables:
       files_commits:
         - go.sum
 
+gitleaks:
+  stage: lint
+  image:
+    name: ghcr.io/gitleaks/gitleaks:v8.30.1
+    entrypoint: [""]
+  script:
+    - gitleaks dir . --report-format json --report-path gitleaks-report.json
+  artifacts:
+    paths:
+      - gitleaks-report.json
+    when: always
+
 lint:golangci:
   stage: lint
   image:
     name: golangci/golangci-lint:v2.11.3
     entrypoint: [""]
   script:
-    - golangci-lint run ./...
+    - golangci-lint run --output.code-climate.path=gl-code-quality-report.json
+  artifacts:
+    reports:
+      codequality: gl-code-quality-report.json
+
+sast:gosec:
+  stage: lint
+  image: 
+    name: ghcr.io/securego/gosec:2.25.0
+    entrypoint: [""]
+  script:
+    - gosec -fmt=json -out=gosec-report.json ./...
+  artifacts:
+    reports:
+      sast: gosec-report.json
 
 test:unit:
   stage: test
@@ -38,31 +70,82 @@ test:unit:
   script:
     - go test -v -cover ./...
 
-.docker:
-  image: docker:24
-  services:
-    - docker:24-dind
-  before_script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
-
 build:docker:
   stage: build
   extends: .docker
   script:
-    - docker build -t $IMAGE_TAG .
-    - docker push $IMAGE_TAG
+    - docker build -t $IMAGE_NAME:$CI_COMMIT_SHORT_SHA .
+    - docker save -o $IMAGE_TARBALL $IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_TAG =~ /^v.*/
+  artifacts:
+    paths:
+      - $IMAGE_TARBALL
+    expire_in: 1 day
 
-deploy:
-  stage: deploy
-  extends: .docker
-  tags:
-    - prod
+trivy-scan:
+  stage: sca
+  image: 
+    name: ghcr.io/aquasecurity/trivy:0.69.3
+    entrypoint: [""]
   script:
-    - docker pull $IMAGE_TAG
-    - docker stop $CONTAINER_NAME || true
-    - docker rm $CONTAINER_NAME || true
-    - docker run -d --name $CONTAINER_NAME --restart unless-stopped -p $PORT:$PORT $IMAGE_TAG
-    - docker ps | grep $CONTAINER_NAME
-  only:
-    - master
-  when: manual
+    - trivy image --input $IMAGE_TARBALL --severity HIGH,CRITICAL --ignore-status fixed --exit-code 1 --format sarif --output trivy-report.sarif
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_TAG =~ /^v.*/
+  cache:
+    paths:
+      - .trivycache/
+  artifacts:
+    reports:
+      container_scanning: trivy-report.sarif
+  allow_failure: true
+
+push:registry:
+  stage: push
+  extends: .docker
+  script:
+    - docker load -i $IMAGE_TARBALL
+    - |
+      if [[ -n "$CI_COMMIT_TAG" ]]; then
+        docker tag $IMAGE_NAME:$CI_COMMIT_SHORT_SHA $IMAGE_NAME:$CI_COMMIT_TAG
+      fi
+    - docker push --all-tags $IMAGE_NAME
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_TAG =~ /^v.*/
+
+deploy:staging:
+  stage: deploy
+  trigger:
+    strategy: depend
+    include: 
+      - local: .gitlab/downstream-deploy.yml 
+        inputs: 
+          image-tag: $IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+          environment: staging
+          app-port: $PORT 
+          container-name: $CONTAINER_NAME
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+  environment:
+    name: staging
+
+deploy:production: 
+  stage: deploy 
+  trigger: 
+    strategy: depend 
+    include: 
+      - local: .gitlab/downstream-deploy.yml 
+        inputs: 
+          image-tag: $IMAGE_NAME:$CI_COMMIT_TAG 
+          environment: production 
+          app-port: $PORT 
+          container-name: $CONTAINER_NAME 
+  rules: 
+    - if: $CI_COMMIT_TAG =~ /^v.*/ 
+  environment: 
+    name: production
