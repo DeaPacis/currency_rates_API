@@ -37,7 +37,5 @@ update-manifests:
     - "sed -i \"s|image: apochebut03/currency-app:.*|image: $IMAGE_TAG|\" deployment.yaml"
     
     - git diff --quiet || (git add deployment.yaml && git commit -m "$COMMIT_MSG" && git push origin main)
-  only:
-    - main
   variables:
     MANIFEST_REPO_TOKEN: $MANIFEST_REPO_TOKEN
