@@ -123,7 +123,7 @@ update-k8s-manifests:staging:
   trigger:
     strategy: depend
     include:
-      - project: 'a.pochebut/infra'
+      - project: 'education/devops/2026/a.pochebut/infra'
         ref: 'a.pochebut/k8s-cicd'
         file: '.gitlab/update-manifests.yml'
         inputs:
@@ -140,7 +140,7 @@ update-k8s-manifests:production:
   trigger:
     strategy: depend
     include:
-      - project: 'a.pochebut/infra'
+      - project: 'education/devops/2026/a.pochebut/infra'
         ref: 'a.pochebut/k8s-cicd'
         file: '.gitlab/update-manifests.yml'
         inputs:
