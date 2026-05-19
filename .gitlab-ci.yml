@@ -118,34 +118,69 @@ push:registry:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
     - if: $CI_COMMIT_TAG =~ /^v.*/
 
-deploy:staging:
+update-k8s-manifests:staging:
   stage: deploy
   trigger:
     strategy: depend
-    include: 
-      - local: .gitlab/downstream-deploy.yml 
-        inputs: 
-          image-tag: $IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+    include:
+      - project: 'education/devops/2026/a.pochebut/infra'
+        ref: 'a.pochebut/k8s-cicd'
+        file: '.gitlab/update-manifests.yml'
+        inputs:
           environment: staging
-          app-port: $PORT 
-          container-name: $CONTAINER_NAME
+          image-tag: $IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+          commit-message: "Update staging image to $CI_COMMIT_SHORT_SHA"
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
   environment:
     name: staging
 
-deploy:production: 
-  stage: deploy 
-  trigger: 
-    strategy: depend 
-    include: 
-      - local: .gitlab/downstream-deploy.yml 
-        inputs: 
-          image-tag: $IMAGE_NAME:$CI_COMMIT_TAG 
-          environment: production 
-          app-port: $PORT 
-          container-name: $CONTAINER_NAME 
-  rules: 
-    - if: $CI_COMMIT_TAG =~ /^v.*/ 
-  environment: 
+update-k8s-manifests:production:
+  stage: deploy
+  trigger:
+    strategy: depend
+    include:
+      - project: 'education/devops/2026/a.pochebut/infra'
+        ref: 'a.pochebut/k8s-cicd'
+        file: '.gitlab/update-manifests.yml'
+        inputs:
+          environment: production
+          image-tag: $IMAGE_NAME:$CI_COMMIT_TAG
+          commit-message: "Production release $CI_COMMIT_TAG"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v.*/
+      when: manual
+  environment:
     name: production
+
+# deploy:staging:
+#   stage: deploy
+#   trigger:
+#     strategy: depend
+#     include: 
+#       - local: .gitlab/downstream-deploy.yml 
+#         inputs: 
+#           image-tag: $IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+#           environment: staging
+#           app-port: $PORT 
+#           container-name: $CONTAINER_NAME
+#   rules:
+#     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+#   environment:
+#     name: staging
+
+# deploy:production: 
+#   stage: deploy 
+#   trigger: 
+#     strategy: depend 
+#     include: 
+#       - local: .gitlab/downstream-deploy.yml 
+#         inputs: 
+#           image-tag: $IMAGE_NAME:$CI_COMMIT_TAG 
+#           environment: production 
+#           app-port: $PORT 
+#           container-name: $CONTAINER_NAME 
+#   rules: 
+#     - if: $CI_COMMIT_TAG =~ /^v.*/ 
+#   environment: 
+#     name: production
