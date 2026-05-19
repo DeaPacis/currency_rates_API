@@ -124,7 +124,7 @@ update-k8s-manifests:staging:
     strategy: depend
     include:
       - project: 'education/devops/2026/a.pochebut/infra'
-        ref: 'a.pochebut/k8s-cicd'
+        ref: 'main'
         file: '.gitlab/update-manifests.yml'
         inputs:
           environment: staging
@@ -141,7 +141,7 @@ update-k8s-manifests:production:
     strategy: depend
     include:
       - project: 'education/devops/2026/a.pochebut/infra'
-        ref: 'a.pochebut/k8s-cicd'
+        ref: 'main'
         file: '.gitlab/update-manifests.yml'
         inputs:
           environment: production
